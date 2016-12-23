@@ -1,0 +1,5 @@
+This is rather ugly, incomplete, but fast first attempt at parsing valid data
+dumps in SSIES-3 [1] EDR format.  It does not require any dependencies, only
+modern C++ compiler and STL.
+
+[1] - Special Sensor-Ions, Electrons, and Scintillation
