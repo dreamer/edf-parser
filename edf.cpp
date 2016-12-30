@@ -23,22 +23,33 @@ struct spacecraft_location
 	double altitude = 0.;        // km
 };
 
-enum class potential_source { CPU, SENPOT, };
-
-enum class plasma_density_source { SM, DM, EP, };
-
-enum class ckl_qualifier {
-	NO_ANALYSIS_ATTEMPT,
-	NO_ANALYSIS_NO_DATA,
-	NO_ANALYSIS_RMS_TOO_LOW,
-	ANALYSIS_256_POINTS,
-	ANALYSIS_512_POINTS,
+enum class potential_source
+{
+	CPU    = 1,
+	SENPOT = 2,
 };
 
-enum class ckl_source {
-	SM_DENSITY_DATA,
-	SM_DENSITY_FILTER_DATA,
-	EP_DC_DENSITY_DATA,
+enum class plasma_density_source
+{
+	SM = 1,
+	DM = 2,
+	EP = 3,
+};
+
+enum class ckl_qualifier
+{
+	NO_ANALYSIS_ATTEMPT     = 0,
+	NO_ANALYSIS_NO_DATA     = 1,
+	NO_ANALYSIS_RMS_TOO_LOW = 2,
+	ANALYSIS_256_POINTS     = 3,
+	ANALYSIS_512_POINTS     = 4,
+};
+
+enum class ckl_source
+{
+	SM_DENSITY_DATA        = 1,
+	SM_DENSITY_FILTER_DATA = 2,
+	EP_DC_DENSITY_DATA     = 3,
 };
 
 struct ckl_analysis
@@ -124,73 +135,13 @@ spacecraft_location parse_spacecraft_location(int & line)
 	return s;
 }
 
-potential_source parse_potential_source(int & line)
+template<typename Source>
+Source parse_source(int & line)
 {
 	line++;
-	int s = 0;
+	int s = -1;
 	scanf("%d\n", &s);
-	switch (s) {
-		case 1: return potential_source::CPU;
-		case 2: return potential_source::SENPOT;
-		default:
-			std::cerr << "error on line " << line << ": "
-			          << "unrecognized source (" << s << ")"
-			          << std::endl;
-			exit(1);
-	}
-}
-
-plasma_density_source parse_plasma_density_source(int & line)
-{
-	line++;
-	int s = 0;
-	scanf("%d\n", &s);
-	switch (s) {
-		case 1: return plasma_density_source::SM;
-		case 2: return plasma_density_source::DM;
-		case 3: return plasma_density_source::EP;
-		default:
-			std::cerr << "error on line " << line << ": "
-			          << "unrecognized source (" << s << ")"
-			          << std::endl;
-			exit(1);
-	}
-}
-
-ckl_qualifier parse_ckl_qualifier(int & line)
-{
-	line++;
-	int q = -1;
-	scanf("%d\n", &q);
-	switch (q) {
-		case 0: return ckl_qualifier::NO_ANALYSIS_ATTEMPT;
-		case 1: return ckl_qualifier::NO_ANALYSIS_NO_DATA;
-		case 2: return ckl_qualifier::NO_ANALYSIS_RMS_TOO_LOW;
-		case 3: return ckl_qualifier::ANALYSIS_256_POINTS;
-		case 4: return ckl_qualifier::ANALYSIS_512_POINTS;
-		default:
-			std::cerr << "error on line " << line << ": "
-			          << "unrecognized qualifier (" << q << ")"
-			          << std::endl;
-			exit(1);
-	}
-}
-
-ckl_source parse_ckl_source(int & line)
-{
-	line++;
-	int s = 0;
-	scanf("%d\n", &s);
-	switch (s) {
-		case 1: return ckl_source::SM_DENSITY_DATA;
-		case 2: return ckl_source::SM_DENSITY_FILTER_DATA;
-		case 3: return ckl_source::EP_DC_DENSITY_DATA;
-		default:
-			std::cerr << "error on line " << line << ": "
-			          << "unrecognized source (" << s << ")"
-			          << std::endl;
-			exit(1);
-	}
+	return Source(s);
 }
 
 ckl_analysis parse_ckl_analysis(int & line)
@@ -208,7 +159,7 @@ ckl_analysis parse_ckl_analysis(int & line)
 	for (auto & x : a.power_density_spectrum)
 		scanf("%lf", &x);
 
-	a.qualifier = parse_ckl_qualifier(line);
+	a.qualifier = parse_source<ckl_qualifier>(line);
 
 	return a;
 }
@@ -222,7 +173,7 @@ ckl_analyses parse_ckl_analyses(int & line)
 	for (auto & x : a.analyses)
 		x = parse_ckl_analysis(line);
 
-	a.data_used = parse_ckl_source(line);
+	a.data_used = parse_source<ckl_source>(line);
 
 	return a;
 }
@@ -243,13 +194,13 @@ edr parse_edr(int & line)
 	line++; // counting all 15 values as if they were in single line
 	for (auto & x : r.satellite_potential)
 		scanf("%lf", &x);
-	r.potential_sensor = parse_potential_source(line);
+	r.potential_sensor = parse_source<potential_source>(line);
 
 	discard_line(line); // PRIMARY PLASME DENSITY (…)
 	line += 10;
 	for (auto & p : r.plasma_density)
 		scanf("%lf", &p);
-	r.plasma_sensor = parse_plasma_density_source(line);
+	r.plasma_sensor = parse_source<plasma_density_source>(line);
 
 	discard_line(line); // HORIZONTAL ION DRIFT VELOCS
 	line += 10;
@@ -295,7 +246,7 @@ int main()
 	for (const auto x : example.vertical_ion_drift)
 		std::cout << x << std::endl;
 	*/
-	std::cout << example.ckl.analyses[5].rms << std::endl;
+	std::cout << int(example.ckl.analyses[1].qualifier) << std::endl;
 
 	return 0;
 }
