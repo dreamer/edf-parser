@@ -142,6 +142,8 @@ struct edr
 	ep_sweep_analyses ep;
 
 	rpa_sweep_analyses rpa;
+
+	std::array<double, 60> dm_ion_density ; // ion/cm³
 };
 
 void discard_line(int & line)
@@ -352,6 +354,12 @@ edr parse_edr(int & line)
 
 	r.rpa = parse_rpa_sweep_analyses(line);
 
+	discard_line(line); // DM ION DENSITY
+	line += 10;
+	for (auto & p : r.dm_ion_density)
+		scanf("%lf", &p);
+	scanf("\n");
+
 	// TODO continue here:
 
 	// FIXME remove when whole parser is implemented
@@ -382,7 +390,7 @@ int main()
 	for (const auto x : example.vertical_ion_drift)
 		std::cout << x << std::endl;
 	*/
-	std::cout << example.ep.sets[14].surrogate << std::endl;
+	std::cout << example.rpa.sets[14].ion_density << std::endl;
 
 	return 0;
 }
