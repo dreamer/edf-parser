@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <deque>
 #include <iostream>
+#include <chrono>
 
 struct edr_header
 {
@@ -52,6 +53,12 @@ enum class ckl_source
 	EP_DC_DENSITY_DATA     = 3,
 };
 
+enum class ep_source
+{
+	GROUND = 1, // Ground processing analysis
+	CPU    = 2, // On-board microprocessor analysis
+};
+
 struct ckl_analysis
 {
 	double rms = 0.;
@@ -66,6 +73,22 @@ struct ckl_analyses
 {
 	std::array<ckl_analysis, 6> analyses;
 	ckl_source data_used;
+};
+
+struct ep_sweep_analysis
+{
+	std::chrono::seconds sweep_center_time; // UT
+	double electron_density; // el/cm³
+	double electron_temperature; // K
+	double satellite_potential; // volts
+	int qualifier; // TODO format description not clear - investigate
+	double surrogate; // EP photo-electron surrogate value
+};
+
+struct ep_sweep_analyses
+{
+	std::array<ep_sweep_analysis, 15> sets;
+	ep_source source;
 };
 
 struct edr
@@ -84,6 +107,8 @@ struct edr
 	std::array<double, 60> vertical_ion_drift; // m/s
 
 	ckl_analyses ckl;
+
+	ep_sweep_analyses ep;
 };
 
 void discard_line(int & line)
@@ -178,6 +203,43 @@ ckl_analyses parse_ckl_analyses(int & line)
 	return a;
 }
 
+ep_sweep_analysis parse_ep_sweep_analysis(int & line)
+{
+	line++;
+	ep_sweep_analysis a;
+
+	int time = 0;
+	scanf("%d %lf %lf %lf %d %lf\n",
+	      &time,
+	      &a.electron_density,
+	      &a.electron_temperature,
+	      &a.satellite_potential,
+	      &a.qualifier,
+	      &a.surrogate);
+	a.sweep_center_time = std::chrono::seconds(time);
+
+	return a;
+}
+
+// FIXME this should sometimes parse sections:
+//       EP AVERAGE DENSITIES
+//	 and some more, but it's missing from example data
+ep_sweep_analyses parse_ep_sweep_analyses(int & line)
+{
+	discard_line(line); // EP SWEEP ANALYSES SETS
+
+	ep_sweep_analyses e;
+
+	for (auto & s : e.sets)
+		s = parse_ep_sweep_analysis(line);
+
+	discard_line(line); // EP ANALYSES SOURCE
+
+	e.source = parse_source<ep_source>(line);
+
+	return e;
+}
+
 edr parse_edr(int & line)
 {
 	const auto end_line = line + 114;
@@ -216,6 +278,8 @@ edr parse_edr(int & line)
 
 	r.ckl = parse_ckl_analyses(line);
 
+	r.ep = parse_ep_sweep_analyses(line);
+
 	// TODO continue here:
 
 	// FIXME remove when whole parser is implemented
@@ -246,7 +310,7 @@ int main()
 	for (const auto x : example.vertical_ion_drift)
 		std::cout << x << std::endl;
 	*/
-	std::cout << int(example.ckl.analyses[1].qualifier) << std::endl;
+	std::cout << example.ep.sets[14].surrogate << std::endl;
 
 	return 0;
 }
