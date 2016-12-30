@@ -4,6 +4,8 @@
 #include <iostream>
 #include <chrono>
 
+using seconds = std::chrono::seconds;
+
 struct edr_header
 {
 	unsigned record_no = 0;
@@ -59,6 +61,8 @@ enum class ep_source
 	CPU    = 2, // On-board microprocessor analysis
 };
 
+using rpa_source = ep_source;
+
 struct ckl_analysis
 {
 	double rms = 0.;
@@ -77,7 +81,7 @@ struct ckl_analyses
 
 struct ep_sweep_analysis
 {
-	std::chrono::seconds sweep_center_time; // UT
+	seconds sweep_center_time; // UT
 	double electron_density; // el/cm³
 	double electron_temperature; // K
 	double satellite_potential; // volts
@@ -89,6 +93,33 @@ struct ep_sweep_analyses
 {
 	std::array<ep_sweep_analysis, 15> sets;
 	ep_source source;
+};
+
+struct rpa_sweep_analysis
+{
+	seconds sweep_center_time; // UT
+	double op_density;         // O+ density (ion/cm³)
+	double hp_hep_density;     // Total (H+ + He+) density (ion/cm³)
+	int light_ion_flag;        // Light ion flag (integer)
+                                   // 0  - No light ion
+                                   // 1  - Light ion is H+
+                                   // 2  - Light ion is He+
+                                   // 3+ - = 3 + 10000 x (H+ fraction)
+	double ion_temperature;    // K
+	double ion_drift;          // Ram ion drift velocity (m/s)
+	int qualifier;             // FIXME replace with state
+			           // 0 - Analysis terminated unsuccessfully
+                                   // 1 - Successful analysis
+	double ion_density;        // RPA-derived total ion density
+
+	// Note some records may only have valid values for field 1 and 8,
+	// these will have a value of 0 in field 7.
+};
+
+struct rpa_sweep_analyses
+{
+	std::array<rpa_sweep_analysis, 15> sets;
+	rpa_source source;
 };
 
 struct edr
@@ -109,6 +140,8 @@ struct edr
 	ckl_analyses ckl;
 
 	ep_sweep_analyses ep;
+
+	rpa_sweep_analyses rpa;
 };
 
 void discard_line(int & line)
@@ -216,7 +249,7 @@ ep_sweep_analysis parse_ep_sweep_analysis(int & line)
 	      &a.satellite_potential,
 	      &a.qualifier,
 	      &a.surrogate);
-	a.sweep_center_time = std::chrono::seconds(time);
+	a.sweep_center_time = seconds(time);
 
 	return a;
 }
@@ -238,6 +271,43 @@ ep_sweep_analyses parse_ep_sweep_analyses(int & line)
 	e.source = parse_source<ep_source>(line);
 
 	return e;
+}
+
+rpa_sweep_analysis parse_rpa_sweep_analysis(int & line)
+{
+	line++;
+	rpa_sweep_analysis a;
+
+	int time = 0;
+	int qualifier = 0;
+	scanf("%d %lf %lf %d %lf %lf %d %lf\n",
+	      &time,
+	      &a.op_density,
+	      &a.hp_hep_density,
+	      &a.light_ion_flag,
+	      &a.ion_temperature,
+	      &a.ion_drift,
+	      &qualifier,
+	      &a.ion_density);
+
+	a.sweep_center_time = seconds(time);
+	a.qualifier = qualifier;
+
+	return a;
+}
+
+rpa_sweep_analyses parse_rpa_sweep_analyses(int & line)
+{
+	discard_line(line); // RPA SWEEP ANALYSES SETS, THEN SOURCE
+
+	rpa_sweep_analyses r;
+
+	for (auto & s : r.sets)
+		s = parse_rpa_sweep_analysis(line);
+
+	r.source = parse_source<rpa_source>(line);
+
+	return r;
 }
 
 edr parse_edr(int & line)
@@ -279,6 +349,8 @@ edr parse_edr(int & line)
 	r.ckl = parse_ckl_analyses(line);
 
 	r.ep = parse_ep_sweep_analyses(line);
+
+	r.rpa = parse_rpa_sweep_analyses(line);
 
 	// TODO continue here:
 
