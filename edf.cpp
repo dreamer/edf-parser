@@ -122,9 +122,30 @@ struct rpa_sweep_analyses
 	rpa_source source;
 };
 
+struct engineering_data
+{
+	double adc_temperature; // C
+	double sep_temperature; //
+	double voltage;         // DM offset voltage (volts) (IES-2)
+				// RPA plasma plate potential (volts) (IES-3)
+	int dm_mode;            //
+				// IES-2:
+				//   -1: Undefined
+				//    0: Normal
+				//  1-8: H+
+				//    9: FIBA
+				//
+				// IES-3:
+				//    0: Slow
+				//    1: Normal
+	int ep_mode;            // FIXME replace with enum (0-6 : A,B,BS,C,D,DS,E)
+	double vip;             // VIP at EDR start (volts)
+};
+
 struct edr
 {
 	edr_header header;
+
 	spacecraft_location ephemeris[3];
 
 	std::array<double, 15> satellite_potential; // volts
@@ -144,6 +165,8 @@ struct edr
 	rpa_sweep_analyses rpa;
 
 	std::array<double, 60> dm_ion_density ; // ion/cm³
+
+	engineering_data edata;
 };
 
 void discard_line(int & line)
@@ -312,10 +335,26 @@ rpa_sweep_analyses parse_rpa_sweep_analyses(int & line)
 	return r;
 }
 
+engineering_data parse_engineering_data(int & line)
+{
+	discard_line(line); // ENGINEERING DATA
+
+	double unused = 0.;
+	engineering_data e;
+	scanf("%lf %lf %lf %lf %d %d %lf\n",
+	      &unused,
+	      &e.adc_temperature,
+	      &e.sep_temperature,
+	      &e.voltage,
+	      &e.dm_mode,
+	      &e.ep_mode,
+	      &e.vip);
+
+	return e;
+}
+
 edr parse_edr(int & line)
 {
-	const auto end_line = line + 114;
-
 	edr r;
 	r.header = parse_edr_header(line);
 
@@ -360,12 +399,10 @@ edr parse_edr(int & line)
 		scanf("%lf", &p);
 	scanf("\n");
 
-	// TODO continue here:
+	r.edata = parse_engineering_data(line);
 
-	// FIXME remove when whole parser is implemented
-	// discard rest of edr
-	for (auto i = line; i < end_line; ++i)
-		discard_line(line);
+	discard_line(line); // FILLER
+	discard_line(line); // Filler content
 
 	return r;
 }
@@ -390,7 +427,7 @@ int main()
 	for (const auto x : example.vertical_ion_drift)
 		std::cout << x << std::endl;
 	*/
-	std::cout << example.rpa.sets[14].ion_density << std::endl;
+	std::cout << example.edata.dm_mode << std::endl;
 
 	return 0;
 }
