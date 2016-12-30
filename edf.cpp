@@ -25,7 +25,37 @@ struct spacecraft_location
 
 enum class potential_source { CPU, SENPOT, };
 
-enum class plasma_density_source { SM, DM, EP, }; 
+enum class plasma_density_source { SM, DM, EP, };
+
+enum class ckl_qualifier {
+	NO_ANALYSIS_ATTEMPT,
+	NO_ANALYSIS_NO_DATA,
+	NO_ANALYSIS_RMS_TOO_LOW,
+	ANALYSIS_256_POINTS,
+	ANALYSIS_512_POINTS,
+};
+
+enum class ckl_source {
+	SM_DENSITY_DATA,
+	SM_DENSITY_FILTER_DATA,
+	EP_DC_DENSITY_DATA,
+};
+
+struct ckl_analysis
+{
+	double rms = 0.;
+	double t1  = 0.;
+	double p1  = 0.;
+	double ckl = 0.;
+	std::array<double, 15> power_density_spectrum;
+	ckl_qualifier qualifier;
+};
+
+struct ckl_analyses
+{
+	std::array<ckl_analysis, 6> analyses;
+	ckl_source data_used;
+};
 
 struct edr
 {
@@ -41,6 +71,8 @@ struct edr
 	std::array<double, 60> horizontal_ion_drift; // m/s
 
 	std::array<double, 60> vertical_ion_drift; // m/s
+
+	ckl_analyses ckl;
 };
 
 void discard_line(int & line)
@@ -125,6 +157,76 @@ plasma_density_source parse_plasma_density_source(int & line)
 	}
 }
 
+ckl_qualifier parse_ckl_qualifier(int & line)
+{
+	line++;
+	int q = -1;
+	scanf("%d\n", &q);
+	switch (q) {
+		case 0: return ckl_qualifier::NO_ANALYSIS_ATTEMPT;
+		case 1: return ckl_qualifier::NO_ANALYSIS_NO_DATA;
+		case 2: return ckl_qualifier::NO_ANALYSIS_RMS_TOO_LOW;
+		case 3: return ckl_qualifier::ANALYSIS_256_POINTS;
+		case 4: return ckl_qualifier::ANALYSIS_512_POINTS;
+		default:
+			std::cerr << "error on line " << line << ": "
+			          << "unrecognized qualifier (" << q << ")"
+			          << std::endl;
+			exit(1);
+	}
+}
+
+ckl_source parse_ckl_source(int & line)
+{
+	line++;
+	int s = 0;
+	scanf("%d\n", &s);
+	switch (s) {
+		case 1: return ckl_source::SM_DENSITY_DATA;
+		case 2: return ckl_source::SM_DENSITY_FILTER_DATA;
+		case 3: return ckl_source::EP_DC_DENSITY_DATA;
+		default:
+			std::cerr << "error on line " << line << ": "
+			          << "unrecognized source (" << s << ")"
+			          << std::endl;
+			exit(1);
+	}
+}
+
+ckl_analysis parse_ckl_analysis(int & line)
+{
+	ckl_analysis a;
+
+	line++;
+	scanf("%lf %lf %lf %lf\n",
+	      &a.rms,
+	      &a.t1,
+	      &a.p1,
+	      &a.ckl);
+
+	line++;
+	for (auto & x : a.power_density_spectrum)
+		scanf("%lf", &x);
+
+	a.qualifier = parse_ckl_qualifier(line);
+
+	return a;
+}
+
+ckl_analyses parse_ckl_analyses(int & line)
+{
+	discard_line(line); // CKL ANALYSES, THEN SOURCE
+
+	ckl_analyses a;
+
+	for (auto & x : a.analyses)
+		x = parse_ckl_analysis(line);
+
+	a.data_used = parse_ckl_source(line);
+
+	return a;
+}
+
 edr parse_edr(int & line)
 {
 	const auto end_line = line + 114;
@@ -161,6 +263,8 @@ edr parse_edr(int & line)
 		scanf("%lf", &p);
 	scanf("\n");
 
+	r.ckl = parse_ckl_analyses(line);
+
 	// TODO continue here:
 
 	// FIXME remove when whole parser is implemented
@@ -183,12 +287,15 @@ int main()
 	std::cout << "lines parsed: " << line_counter << std::endl;
 	std::cout << "records read: " << all_records.size() << std::endl;
 
-	const auto example = all_records[42]; // line 4790
+	const auto example = all_records[0]; // line 4790
 	std::cout << "example record: "     << example.header.record_no << std::endl;
 	std::cout << "example record edr: " << example.header.edr_no << std::endl;
+	/*
 	std::cout << "example values for vertical ion drift: " << std::endl;
 	for (const auto x : example.vertical_ion_drift)
 		std::cout << x << std::endl;
+	*/
+	std::cout << example.ckl.analyses[5].rms << std::endl;
 
 	return 0;
 }
